@@ -20,9 +20,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass 123456
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "123456", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -42,7 +42,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: "123456"
       REDIS_SDK_CONFIG_HOST: redis
       REDIS_SDK_CONFIG_PORT: "6379"
-      REDIS_SDK_CONFIG_PASSWORD: ""
+      REDIS_SDK_CONFIG_PASSWORD: "123456"
       TZ: Asia/Shanghai
     ports:
       - "8080:8080"
