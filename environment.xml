@@ -1,0 +1,34 @@
+<environment>
+    <parameter>
+        <key>system</key>
+        <value>Windows 11</value>
+    </parameter>
+    <parameter>
+        <key>python version</key>
+        <value>3.12</value>
+    </parameter>
+    <parameter>
+        <key>allure version</key>
+        <value>allure-2.30.0</value>
+    </parameter>
+    <parameter>
+        <key>BaseUrl</key>
+        <value>http://localhost:8080</value>
+    </parameter>
+    <parameter>
+        <key>WS</key>
+        <value>ws://localhost:8080/ws/websocket</value>
+    </parameter>
+    <parameter>
+        <key>Project</key>
+        <value>直播竞拍平台自动化测试</value>
+    </parameter>
+    <parameter>
+        <key>environment</key>
+        <value>本地环境</value>
+    </parameter>
+    <parameter>
+        <key>author</key>
+        <value>lyy</value>
+    </parameter>
+</environment>

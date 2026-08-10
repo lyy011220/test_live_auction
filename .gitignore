@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+reports/temps/
+reports/allures/
+reports/k6/
+reports/result.txt
+reports/traceability.md
+reports/traceability-current.md
+reports/user_pool.json
+tests/**/reports/
+load/data/*.json
+*.log
+.idea/

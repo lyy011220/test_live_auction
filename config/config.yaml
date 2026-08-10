@@ -1,0 +1,36 @@
+# 项目名称
+project_name: 直播竞拍平台自动化测试
+
+# 基础路径配置
+BASE:
+  base_live_auction_url: http://localhost:8080
+  ws_url: ws://localhost:8080/ws/websocket
+
+# 日志配置
+LOG:
+  log_level: info
+  console_log_format: '%(log_color)s[%(levelname)s]-[%(asctime)s]-%(message)s'
+  file_log_format: '[%(levelname)s]-[%(asctime)s]-%(message)s'
+
+# 接口超时(秒)
+API_TIMEOUT:
+  timeout: 5
+
+# STOMP / WebSocket 配置
+STOMP:
+  stomp_timeout: 5
+  message_timeout: 3
+  read_interval: 0.1
+  heart_beat: '10000,10000'
+  bid_destination: /app/bid
+
+# 账号
+ACCOUNT:
+  default_password: '123456'
+
+# k6
+K6:
+  bin: k6
+
+# 测试报告类型: 当前仅支持 allure
+REPORT_TYPE: allure

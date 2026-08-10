@@ -1,0 +1,6 @@
+pytest>=8.0
+allure-pytest>=2.13
+requests>=2.32
+stomp.py>=8.1
+PyYAML>=6.0
+colorlog>=6.7
