@@ -187,6 +187,8 @@ def test_bid_sta_006_bid_after_room_stop(live_room, make_bidder):
     assert after_data.get("bidCount") == before_data.get("bidCount"), "拒绝出价后次数不得变化"
 
 
+@EPIC
+@FEATURE
 @allure.story("BID-STA-007")
 @allure.severity(allure.severity_level.NORMAL)
 @allure.title("BID-STA-007 自然到期临界时刻出价成功且触发延迟")
