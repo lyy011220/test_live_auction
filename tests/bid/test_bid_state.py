@@ -186,6 +186,7 @@ def test_bid_sta_006_bid_after_room_stop(live_room, make_bidder):
     assert after_data.get("currentPrice") == before_data.get("currentPrice"), "拒绝出价后价格不得变化"
     assert after_data.get("bidCount") == before_data.get("bidCount"), "拒绝出价后次数不得变化"
 
+
 @EPIC
 @FEATURE
 @allure.story("BID-STA-007")
