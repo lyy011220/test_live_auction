@@ -2,7 +2,7 @@
 
 `live_auction_qa` 是面向直播竞拍后端的独立自动化测试项目，覆盖 REST API、STOMP over WebSocket、Python 确定性并发和 k6 性能测试。
 
-当前源码登记 **72 个稳定 Case ID**，pytest 收集 **90 个执行项**；参数化场景会让一个 Case ID 生成多个执行项。用例明细见 [`docs/直播竞拍平台测试用例.md`](docs/直播竞拍平台测试用例.md)。
+当前源码登记 **74 个稳定 Case ID**，pytest 收集 **128 个执行项**；参数化场景会让一个 Case ID 生成多个执行项，性能基础设施还包含不登记业务 Case ID 的契约测试。用例明细见 [`docs/直播竞拍平台测试用例.md`](docs/直播竞拍平台测试用例.md)。
 
 ## 文档导航
 
@@ -20,8 +20,8 @@
 | AUC | 竞拍生命周期、列表、数值边界和归属权限 | 14 |
 | BID | 出价规则、参数校验、鉴权和状态限制 | 14 |
 | WS | 事件、在线人数、订阅隔离和 STOMP 出价安全 | 12 |
-| CON | 同价竞争、重复请求和陈旧价格竞争 | 3 |
-| PERF | 4 个负载场景和 1 个混合压力场景 | 5 |
+| CON | 3 个 Python 竞争用例和 4 个 k6 有限并发正确性场景 | 7 |
+| PERF | 混合压力稳定性、详情容量和单竞拍热点出价容量 | 3 |
 
 订单、支付和数据库直连校验不在当前范围内。查询与数据一致性通过上述业务域中的终态、列表、排名和出价记录断言完成，不另设 `DATA` Case ID 域。
 
@@ -77,7 +77,7 @@ Copy-Item .env.example .env
 ## 运行测试
 
 ```powershell
-# 仅收集，不访问后端；当前应为 90 个执行项
+# 仅收集，不访问后端；当前应为 128 个执行项
 python -m pytest --collect-only -q
 
 # 健康检查或指定业务域
@@ -102,19 +102,42 @@ allure serve reports\temps
 
 ## 运行 k6 场景
 
-pytest 中的 PERF 用例只验收已有 k6 摘要；摘要不存在时相应用例会跳过。先运行目标场景，再执行 `tests/perf`：
+k6 场景按目的分为两类：有限并发场景验证竞争结果是否正确，性能场景验证持续负载下的错误率和延迟。pytest 只验收已有 k6 摘要；摘要不存在时相应用例会跳过。
+
+性能场景统一通过 `load/k6/lib/performance_metrics.js` 记录 `{endpoint}_requests`、成功率、技术失败率、4xx、5xx、网络错误和成功请求耗时；`load/summarize.py` 会自动发现这些前缀并写入 Markdown 与 Allure 摘要。
 
 ```powershell
-python -m load.runner --scenario bid_concurrent
-python -m load.runner --scenario bid_same_amount_race
-python -m load.runner --scenario bid_repeat_rounds
-python -m load.runner --scenario ws_bid_concurrent
-python -m load.runner --scenario mixed_stress
+# 并发正确性：执行有限请求并核对最终业务状态
+python -m load.concurrency.runner --scenario bid_concurrent
+python -m load.concurrency.runner --scenario bid_same_amount_race
+python -m load.concurrency.runner --scenario bid_repeat_rounds
+python -m load.concurrency.runner --scenario ws_bid_concurrent
 
+# 验收 Python 并发用例与 k6 并发正确性结果
+python -m pytest tests/concurrency -v
+
+# 性能稳定性：持续施加混合负载
+python -m load.performance.runner --scenario mixed_stress
+
+# 详情容量脚本与调度冒烟：1 RPS × 10 秒
+python -m load.performance.runner --scenario detail_capacity --rates 1 --duration 10s --cooldown 0 --pre-allocated-vus 5 --max-vus 10
+
+# 详情容量正式运行：50/100/200/400 RPS，各 2 分钟，档间冷却 15 秒
+python -m load.performance.runner --scenario detail_capacity
+
+# 热点出价容量调度冒烟：每档创建独立竞拍，5 RPS × 30 秒
+python -m load.performance.runner --scenario bid_capacity --rates 5 --duration 30s --cooldown 0 --pre-allocated-vus 10 --max-vus 10
+
+# 热点出价容量正式运行：25/50/100/200/400 RPS，各 2 分钟
+python -m load.performance.runner --scenario bid_capacity
+
+# 验收性能结果
 python -m pytest tests/perf -v
 ```
 
 每个 `reports/k6/<scenario>.json` 必须配套同名 `.meta.json`。验收时会检查场景名、k6 退出码、目标地址、OpenAPI 指纹、可选 `BACKEND_VERSION` 和结果新鲜度，防止复用错误环境或过期结果。
+
+容量结果按运行 ID 分别保存在 `reports/k6/detail_capacity/<run_id>/` 和 `reports/k6/bid_capacity/<run_id>/`。每档拥有独立 JSON、metadata、stdout 和 stderr；热点出价报告还会区分接受写入、正常价格竞争拒绝、非预期拒绝和技术失败，以全部已处理请求计算 p95/p99，并在档后通过竞拍详情核对 `bidCount`、`currentPrice` 和进行中状态。只有 400/409 且错误消息匹配价格竞争语义时才计为正常拒绝；当前后端已确认的默认语义为“加价幅度不符合规则”，文案不同时可通过 `BID_CONFLICT_PATTERNS` 使用 `|` 分隔覆盖。
 
 ## 用例与追溯
 

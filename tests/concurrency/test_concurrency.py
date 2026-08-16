@@ -1,4 +1,4 @@
-"""CON 域 | 并发竞价、重复请求和陈旧价格竞争。"""
+﻿"""CON 域 | 并发竞价、重复请求和陈旧价格竞争。"""
 from decimal import Decimal
 
 import allure

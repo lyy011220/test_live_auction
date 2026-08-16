@@ -1,4 +1,4 @@
-"""STOMP over WebSocket 客户端 (迁移自原 live_auction/websocket.py, 配置改读 config.yaml)。"""
+"""STOMP over WebSocket 客户端"""
 from __future__ import annotations
 
 import json
@@ -8,10 +8,7 @@ from urllib.parse import urlsplit
 
 import allure
 
-try:
-    import stomp
-except ImportError:  # stomp.py 未安装时仍可被收集, 仅在实际连接时报错
-    stomp = None
+import stomp
 
 from commons.logger_util import info_log
 from commons.yaml_util import read_config_yaml

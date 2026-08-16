@@ -7,7 +7,7 @@
 import ws from 'k6/ws';
 import { check } from 'k6';
 import { Trend } from 'k6/metrics';
-import { fetchDetail, parseData, loadTokens, requireEnv } from './lib/common.js';
+import { fetchDetail, parseData, loadTokens, requireEnv } from '../lib/common.js';
 
 const BASE = requireEnv('BASE_URL');
 const ITEM_ID = requireEnv('ITEM_ID');

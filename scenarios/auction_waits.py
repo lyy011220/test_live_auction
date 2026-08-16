@@ -5,7 +5,7 @@ from support.assertions import require_ok
 from support.time_util import seconds_until
 from support.wait_util import wait_until
 
-
+# 轮询竞拍详情，直到剩余秒数 ≤ `target_remaining`
 def wait_until_remaining(
     auction_id,
     target_remaining,

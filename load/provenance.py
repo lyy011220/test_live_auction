@@ -23,7 +23,8 @@ class SummaryValidationError(RuntimeError):
 def metadata_path_for(scenario_name: str) -> Path:
     return REPORTS_K6 / f"{scenario_name}.meta.json"
 
-
+# LRU 缓存 （Least Recently Used）——同一进程内，
+# 同样的 base_url 第二次调用 直接返回缓存 ，不重复发 HTTP 请求。
 @lru_cache(maxsize=8)
 def backend_identity(base_url: str) -> dict:
     """用后端 OpenAPI 内容和声明版本构造可重复比较的环境指纹。"""

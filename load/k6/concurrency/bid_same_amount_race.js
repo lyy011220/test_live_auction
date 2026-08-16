@@ -1,7 +1,7 @@
 // PERF-LOAD-002 | 五人同时同价竞价
 // 5 个用户几乎同时提交相同价格 110 (>= 最低合法价 109), 仅一人成为有效最高出价。
 import { check } from 'k6';
-import { bidOnce, fetchDetail, fetchRanking, isBusinessHandled, loadTokens, parseData, parseList, requireEnv } from './lib/common.js';
+import { bidOnce, fetchDetail, fetchRanking, isBusinessHandled, loadTokens, parseData, parseList, requireEnv } from '../lib/common.js';
 
 const BASE = requireEnv('BASE_URL');
 const ITEM_ID = requireEnv('ITEM_ID');

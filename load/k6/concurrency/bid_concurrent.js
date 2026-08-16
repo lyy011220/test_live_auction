@@ -1,7 +1,7 @@
 // PERF-LOAD-001 | 二十人乱序不同金额并发
 // 设计点: 含非法价(<109)/重复价/最高价300(在 index 12, 非末位), 验证最终价由最高有效出价决定。
 import { check } from 'k6';
-import { bidOnce, fetchDetail, fetchRanking, isBusinessHandled, loadTokens, parseData, parseList, requireEnv } from './lib/common.js';
+import { bidOnce, fetchDetail, fetchRanking, isBusinessHandled, loadTokens, parseData, parseList, requireEnv } from '../lib/common.js';
 
 const BASE = requireEnv('BASE_URL');
 const ITEM_ID = requireEnv('ITEM_ID');

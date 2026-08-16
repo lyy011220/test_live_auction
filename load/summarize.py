@@ -22,6 +22,73 @@ def summary_path_for(scenario_name: str) -> Path:
     return REPORTS_K6 / f"{scenario_name}.json"
 
 
+def _parse_performance_endpoints(metrics: dict) -> dict[str, dict]:
+    """按 ``{endpoint}_*`` 协议自动发现并解析性能指标。"""
+    endpoints = {}
+    suffix = "_requests"
+
+    for metric_name in sorted(metrics):
+        if not metric_name.endswith(suffix):
+            continue
+
+        prefix = metric_name.removesuffix(suffix)
+        success_name = f"{prefix}_success_rate"
+        failure_name = f"{prefix}_technical_failure_rate"
+        if success_name not in metrics or failure_name not in metrics:
+            continue
+
+        requests = metrics.get(metric_name, {})
+        success = metrics.get(success_name, {})
+        technical_failure = metrics.get(failure_name, {})
+        duration = metrics.get(f"{prefix}_success_duration", {})
+
+        endpoint = {
+            "request_count": requests.get("count"),
+            "actual_rps": requests.get("rate"),
+            "success_rate": success.get("value"),
+            "technical_failure_rate": technical_failure.get("value"),
+            "client_errors": metrics.get(f"{prefix}_4xx", {}).get("count", 0),
+            "server_errors": metrics.get(f"{prefix}_5xx", {}).get("count", 0),
+            "network_errors": metrics.get(
+                f"{prefix}_network_errors", {}
+            ).get("count", 0),
+            "success_duration_p95": duration.get("p(95)"),
+            "success_duration_p99": duration.get("p(99)"),
+        }
+
+        optional_metrics = {
+            "accepted": (f"{prefix}_accepted", "count"),
+            "business_rejections": (
+                f"{prefix}_business_rejections",
+                "count",
+            ),
+            "unexpected_rejections": (
+                f"{prefix}_unexpected_rejections",
+                "count",
+            ),
+            "handled_rate": (f"{prefix}_handled_rate", "value"),
+            "handled_duration_p95": (
+                f"{prefix}_handled_duration",
+                "p(95)",
+            ),
+            "handled_duration_p99": (
+                f"{prefix}_handled_duration",
+                "p(99)",
+            ),
+            "accepted_amount_max": (
+                f"{prefix}_accepted_amount",
+                "max",
+            ),
+        }
+        for output_name, (metric_name, value_name) in optional_metrics.items():
+            if metric_name in metrics:
+                endpoint[output_name] = metrics[metric_name].get(value_name)
+
+        endpoints[prefix] = endpoint
+
+    return endpoints
+
+
 def parse(summary_path: Path) -> dict:
     """从 k6 summary JSON 提取关键指标。
 
@@ -36,6 +103,7 @@ def parse(summary_path: Path) -> dict:
     duration = metrics.get("http_req_duration", {})
     iter_duration = metrics.get("iteration_duration", {})
     ws_bid_broadcast = metrics.get("ws_bid_broadcast_ms", {})
+    vus_max = metrics.get("vus_max", {})
     return {
         "scenario": data.get("root_group", {}).get("name", ""),
         "state": data.get("state", {}).get("isFailed", False),
@@ -50,7 +118,11 @@ def parse(summary_path: Path) -> dict:
         "iteration_duration_p95": iter_duration.get("p(95)"),
         "ws_bid_broadcast_p95": ws_bid_broadcast.get("p(95)"),
         "iterations": metrics.get("iterations", {}).get("count"),
-        "vus_max": metrics.get("vus", {}).get("max"),
+        "vus_max": vus_max.get("max", vus_max.get("value")),
+        "dropped_iterations": metrics.get(
+            "dropped_iterations", {}
+        ).get("count", 0),
+        "performance_endpoints": _parse_performance_endpoints(metrics),
     }
 
 
@@ -80,6 +152,43 @@ def to_markdown(m: dict) -> str:
         f"- 迭代次数: {m.get('iterations')}",
         f"- 最大并发 VU: {m.get('vus_max')}",
     ]
+
+    performance_endpoints = m.get("performance_endpoints") or {}
+    if performance_endpoints:
+        lines.extend([
+            "",
+            "## 接口性能指标",
+            "",
+            "| 接口 | 请求数 | 实际 RPS | 成功率 | 技术失败率 | "
+            "成功 p95 | 成功 p99 | 4xx | 5xx | 网络错误 |",
+            "| :--- | ---: | ---: | ---: | ---: | ---: | ---: | "
+            "---: | ---: | ---: |",
+        ])
+
+        def number(value, suffix=""):
+            if not isinstance(value, (int, float)):
+                return "N/A"
+            return f"{value:.2f}{suffix}"
+
+        def percent(value):
+            if not isinstance(value, (int, float)):
+                return "N/A"
+            return f"{value * 100:.2f}%"
+
+        for endpoint, values in sorted(performance_endpoints.items()):
+            lines.append(
+                f"| {endpoint} "
+                f"| {values.get('request_count', 'N/A')} "
+                f"| {number(values.get('actual_rps'))} "
+                f"| {percent(values.get('success_rate'))} "
+                f"| {percent(values.get('technical_failure_rate'))} "
+                f"| {number(values.get('success_duration_p95'), 'ms')} "
+                f"| {number(values.get('success_duration_p99'), 'ms')} "
+                f"| {values.get('client_errors', 0)} "
+                f"| {values.get('server_errors', 0)} "
+                f"| {values.get('network_errors', 0)} |"
+            )
+
     run = m.get("run") or {}
     if run:
         lines.extend([
@@ -99,6 +208,109 @@ def write_markdown(scenario_name: str, m: dict) -> Path:
     return path
 
 
+def capacity_to_markdown(manifest: dict) -> str:
+    """将多档容量运行清单渲染为对比报告。"""
+    is_bid_capacity = manifest.get("scenario") == "bid_capacity"
+    title = (
+        "单竞拍热点出价容量测试"
+        if is_bid_capacity
+        else "竞拍详情容量测试"
+    )
+    lines = [
+        f"# {title}",
+        "",
+        f"- 运行 ID: {manifest.get('run_id')}",
+        f"- 竞拍 ID: {manifest.get('auction_id')}",
+        f"- 目标后端: {manifest.get('base_url')}",
+        f"- 单档时长: {manifest.get('duration')}",
+        f"- 冷却时间: {manifest.get('cooldown_seconds')} 秒",
+        "",
+        "| 目标 RPS | 实际 RPS | "
+        + ("接受率 | " if is_bid_capacity else "成功率 | ")
+        + "技术失败率 | "
+        + ("处理 p95 | 处理 p99 | " if is_bid_capacity else "成功 p95 | 成功 p99 | ")
+        + "4xx | 5xx | 网络错误 | "
+        "丢弃迭代 | 最大 VU | "
+        + (
+            "接受数 | 竞争拒绝 | 非预期拒绝 | 处理率 | 最高接受价 | "
+            if is_bid_capacity
+            else ""
+        )
+        + "结果 | 原因 |",
+        "| ---: | ---: | ---: | ---: | ---: | ---: | "
+        "---: | ---: | ---: | ---: | ---: | "
+        + (
+            "---: | ---: | ---: | ---: | ---: | "
+            if is_bid_capacity
+            else ""
+        )
+        + ":--- | :--- |",
+    ]
+
+    def number(value, suffix=""):
+        if not isinstance(value, (int, float)):
+            return "N/A"
+        return f"{value:.2f}{suffix}"
+
+    def percent(value):
+        if not isinstance(value, (int, float)):
+            return "N/A"
+        return f"{value * 100:.2f}%"
+
+    for stage in manifest.get("stages", []):
+        metrics = stage.get("metrics") or {}
+        duration_p95 = metrics.get(
+            "handled_duration_p95"
+            if is_bid_capacity
+            else "success_duration_p95"
+        )
+        duration_p99 = metrics.get(
+            "handled_duration_p99"
+            if is_bid_capacity
+            else "success_duration_p99"
+        )
+        outcome_columns = ""
+        if is_bid_capacity:
+            outcome_columns = (
+                f"| {metrics.get('accepted', 'N/A')} "
+                f"| {metrics.get('business_rejections', 'N/A')} "
+                f"| {metrics.get('unexpected_rejections', 'N/A')} "
+                f"| {percent(metrics.get('handled_rate'))} "
+                f"| {number(metrics.get('accepted_amount_max'))} "
+            )
+        lines.append(
+            f"| {stage.get('target_rps')} "
+            f"| {number(metrics.get('actual_rps'))} "
+            f"| {percent(metrics.get('success_rate'))} "
+            f"| {percent(metrics.get('technical_failure_rate'))} "
+            f"| {number(duration_p95, 'ms')} "
+            f"| {number(duration_p99, 'ms')} "
+            f"| {metrics.get('client_errors', 'N/A')} "
+            f"| {metrics.get('server_errors', 'N/A')} "
+            f"| {metrics.get('network_errors', 'N/A')} "
+            f"| {metrics.get('dropped_iterations', 'N/A')} "
+            f"| {metrics.get('vus_max', 'N/A')} "
+            f"{outcome_columns}"
+            f"| {stage.get('assessment')} "
+            f"| {', '.join(stage.get('reasons') or []) or '-'} |"
+        )
+
+    not_run = manifest.get("not_run_rates") or []
+    if not_run:
+        lines.extend([
+            "",
+            f"- 未执行档位: {', '.join(str(rate) for rate in not_run)} RPS",
+        ])
+    return "\n".join(lines)
+
+
+def write_capacity_markdown(run_dir: Path, manifest: dict) -> Path:
+    path = run_dir / "summary.md"
+    path.write_text(capacity_to_markdown(manifest), encoding="utf-8")
+    info_log(f"容量对比摘要已写入: {path}")
+    return path
+
+
 def attach_allure(case_id: str, m: dict) -> None:
     """把 k6 指标挂到当前 Allure 测试 (仅在 pytest 上下文生效)。"""
     try:
@@ -115,9 +327,17 @@ def attach_allure(case_id: str, m: dict) -> None:
 
 def load_summary_by_case_id(case_id: str) -> dict | None:
     """按 case_id 反查场景, 若 k6 summary 存在则返回解析后的指标, 否则 None。"""
-    from load.registry import scenario_by_case_id
+    from load.concurrency.registry import (
+        scenario_by_case_id as concurrency_scenario_by_case_id,
+    )
+    from load.performance.registry import (
+        scenario_by_case_id as performance_scenario_by_case_id,
+    )
 
-    s = scenario_by_case_id(case_id)
+    s = (
+        concurrency_scenario_by_case_id(case_id)
+        or performance_scenario_by_case_id(case_id)
+    )
     if s is None:
         return None
     path = summary_path_for(s.name)

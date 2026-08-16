@@ -6,11 +6,11 @@ import http from 'k6/http';
 // 默认回调把 4xx 也算失败, 会误报压测失败率, 这里收窄到 200-499。
 http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }));
 
-// 读取必填环境变量, 缺失则抛错 (由 runner.py 注入)。
+// 读取必填环境变量, 缺失则抛错 (由分类 runner 注入)。
 export function requireEnv(name) {
   const v = __ENV[name];
   if (!v) {
-    throw new Error(`missing env ${name}; run: python -m load.runner --scenario ...`);
+    throw new Error(`missing env ${name}; run: python -m load.<category>.runner --scenario ...`);
   }
   return v;
 }

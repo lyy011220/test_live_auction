@@ -9,7 +9,7 @@ from commons.logger_util import info_log
 
 def _cleanup_auction(client: ApiClient, auction_id) -> None:
     try:
-        AuctionClient(client).admin_cancel(auction_id, "qa fixture cleanup", name="清理竞拍")
+        AuctionClient(client).admin_cancel(auction_id, "fixture cleanup", name="清理竞拍")
     except Exception as exc:  # noqa: BLE001
         info_log(f"清理竞拍 {auction_id} 跳过: {exc}")
 

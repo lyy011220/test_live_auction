@@ -2,7 +2,7 @@
 // 5 VU × 3 轮, 每次出价严格递增且唯一 (amount = 109 + iter*50 + (vu-1)*10), 按轮次轻度错峰。
 // 校验: 无 5xx; 终态 currentPrice==排行榜最高价; 排行榜投影与 bidCount 基本一致。
 import { check, sleep } from 'k6';
-import { bidOnce, fetchDetail, fetchRanking, isBusinessHandled, loadTokens, parseData, parseList, requireEnv } from './lib/common.js';
+import { bidOnce, fetchDetail, fetchRanking, isBusinessHandled, loadTokens, parseData, parseList, requireEnv } from '../lib/common.js';
 
 const BASE = requireEnv('BASE_URL');
 const ITEM_ID = requireEnv('ITEM_ID');
